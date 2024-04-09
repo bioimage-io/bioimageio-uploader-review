@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+
+[project]
+name = "bioimageio-upload-review"
+version = "0.1.0"
+readme = "README.md"
+description = "BioImage.IO Uploader Review API."
+dynamic = ["dependencies"]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.packages.find]
+include = ["bioimageio_upload_review*"]
+exclude = ["tests*", "scripts*"]
+
+[options.entry_points]
+console_scripts = [
+    "bioimageio-upload-review = bioimageio_upload_review.__main__:main",
+]
