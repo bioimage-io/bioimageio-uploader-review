@@ -36,12 +36,13 @@ class ReviewAction(StrEnum):
 @dataclass
 class ReviewData(ResourceData):
     action: ReviewAction
+    message: str = ""
 
     def save(self, backoffice:  BackOffice):
         if self.action == ReviewAction.PUBLISH:
             backoffice.publish(resource_id=self.resource_id, version=self.version,  reviewer=self.user)
         elif self.action == ReviewAction.REQUESTCHANGES:
-            backoffice.request_changes(resource_id=self.resource_id, version=self.version, reviewer=self.user)
+            backoffice.request_changes(resource_id=self.resource_id, version=self.version, reviewer=self.user, reason=self.message)
         else:
             raise ValueError("review_data must contain valid action field")
 
@@ -125,17 +126,19 @@ async def register_review_service(server):
             return Permission.LOGGED_IN
         return Permission.NOT_LOGGED_IN
 
-    async def review(review_message, context=None):
+    async def review(resource_id=str, version=str, action=str, message=str, context=None):
         if login_required and context and context.get("user"):
             assert check_permission(
                 context.get("user")
             ) == Permission.REVIEWER, "You don't have permission to review resources."
         # get the review-service version
-        review_data = {
-            "timestamp": str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
-            "user": context.get("user"),
-            "version": version,
-        }
+        review_data = ReviewData(
+                resource_id=resource_id,
+                version=version,
+                action=ReviewAction(action),
+                message=message,
+                user= context.get("user"),
+            )
         review_data.save(backoffice)
 
     async def chat(resource_id: str, version: str, message: str, context=None):
