@@ -5,7 +5,7 @@ import os
 import fire
 from loguru import logger
 
-from bioimageio_upload_review.api import connect_server
+from bioimageio_uploader_service.api import connect_server
 
 
 def start(
@@ -25,7 +25,7 @@ def start(
         f"--host={host}",
         f"--port={port}",
         f"--public-base-url={public_base_url}",
-        "--startup-functions=bioimageio_upload_review.api:register_review_service",
+        "--startup-functions=bioimageio_uploader_service.api:register_uploader_service",
     ]
     subprocess.run(command)
 

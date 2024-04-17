@@ -1,14 +1,16 @@
 import os
 import json
 import datetime
-import pkg_resources
 from enum import IntEnum, StrEnum, auto
 from dataclasses import dataclass, field
 
 from loguru import logger
 
+
 from bioimageio_collection_backoffice._backoffice import BackOffice
+from bioimageio_uploader_service import __version__
 from imjoy_rpc.hypha import login, connect_to_server
+
 
 class MissingEnvironmentVariable(Exception):
     pass
@@ -58,7 +60,7 @@ class ChatData(ResourceData):
                 author=self.user)
 
 
-CONNECTION_VARS = {"host": "S3_HOST", "bucket": "S3_BUCKET", "folder": "S3_FOLDER"}
+CONNECTION_VARS = {"host": "S3_HOST", "bucket": "S3_BUCKET", "prefix": "S3_FOLDER"}
 
 
 async def connect_server(server_url):
@@ -71,30 +73,34 @@ async def connect_server(server_url):
     server = await connect_to_server(
         {"server_url": server_url, "token": token, "method_timeout": 100}
     )
-    await register_review_service(server)
+    await register_uploader_service(server)
 
 
-async def register_review_service(server):
+async def register_uploader_service(server):
     """Hypha startup function."""
     debug = os.environ.get("BIOIMAGEIO_DEBUG") == "true"
     login_required = os.environ.get("BIOIMAGEIO_LOGIN_REQUIRED") == "true"
-    review_logs_path = os.environ.get("BIOIMAGEIO_REVIEW_LOGS_PATH", "./review_logs")
+    login_required = True
+    uploader_logs_path = os.environ.get("BIOIMAGEIO_REVIEW_LOGS_PATH", "./uploader_logs")
 
     if not set(os.environ).issuperset(CONNECTION_VARS.values()):
         logger.error("Must be run with following env vars: {}", ", ".join(CONNECTION_VARS.values()))
         missing = [var for var in CONNECTION_VARS.values() if var not in os.environ]
         raise MissingEnvironmentVariable(f"Missing environment variables: {missing}")
 
-    backoffice = BackOffice({var: os.environ[env_var] for var, env_var in CONNECTION_VARS.items()})
+    backoffice = BackOffice(**{var: os.environ[env_var] for var, env_var in CONNECTION_VARS.items()})
 
     assert (
-        review_logs_path is not None
+        uploader_logs_path is not None
     ), "Please set the BIOIMAGEIO_REVIEW_LOGS_PATH environment variable to the path of the chat logs folder."
-    if not os.path.exists(review_logs_path):
+    if not os.path.exists(uploader_logs_path):
         print(
-            f"The review session folder is not found at {review_logs_path}, will create one now."
+            f"The uploader log folder is not found at {uploader_logs_path}, will create one now."
         )
-        os.makedirs(review_logs_path, exist_ok=True)
+        os.makedirs(uploader_logs_path, exist_ok=True)
+
+    def user_has_email(context):
+        return context and context.get("user") and context.get("user").get("email")
 
 
     def load_reviewer_emails():
@@ -126,11 +132,24 @@ async def register_review_service(server):
             return Permission.LOGGED_IN
         return Permission.NOT_LOGGED_IN
 
+    def check_context_permission(context):
+        if context is None:
+            return Permission.NOT_LOGGED_IN
+        user = context.get("user")
+        if user is None:
+            return Permission.NOT_LOGGED_IN
+
+        if user['is_anonymous']:
+            return Permission.ANONYMOUS
+        if user['email'] in reviewer_emails:
+            return Permission.REVIEWER
+        if user['email']:
+            return Permission.LOGGED_IN
+        raise PermissionError("Context invalid while checking for permission")
+
     async def review(resource_id=str, version=str, action=str, message=str, context=None):
-        if login_required and context and context.get("user"):
-            assert check_permission(
-                context.get("user")
-            ) == Permission.REVIEWER, "You don't have permission to review resources."
+        if check_context_permission(context) is not Permission.REVIEWER:
+            raise PermissionError("You must be logged in and have permission for this function")
         # get the review-service version
         review_data = ReviewData(
                 resource_id=resource_id,
@@ -143,11 +162,9 @@ async def register_review_service(server):
 
     async def chat(resource_id: str, version: str, message: str, context=None):
         logger.info(f"User: {context.get('user')}, Message: {message}")
-        if context and context.get("user"):
-            assert check_permission(
-                context.get("user")
-            ) >= Permission.LOGGED_IN, "You don't have permission to comment on the review."
-        # get the review-service version
+        if check_context_permission(context) < Permission.LOGGED_IN:
+            raise PermissionError("You must be logged in to comment on the review")
+
         chat_data = ChatData(
             resource_id=resource_id,
             version=version,
@@ -157,31 +174,67 @@ async def register_review_service(server):
 
         chat_data.save(backoffice)
 
+    async def get_from_storage(url:str, context=None):
+        """
+        Basically just a 'middle-man' function to bridge get requests to S3 resource that currently blocks
+        all but a small number of domains
+        """
+
     async def ping(context=None):
-        if login_required and context and context.get("user"):
-            assert check_permission(
-                context.get("user")
-            ) > Permission.NOT_LOGGED_IN, "You don't have permission to use the review service, please sign up and wait for approval"
+        """
+        Check the server status, as long as we're nominally logged in (can be anonymous)
+        """
+        if check_context_permission(context) == Permission.NOT_LOGGED_IN:
+            raise PermissionError("You don't have permission to use the uploader service, please sign up and wait for approval")
         return "pong"
 
+    async def test(context=None):
+        # TODO: REMOVE ME
+        """
+        Test function
+        """
+        if check_context_permission(context) == Permission.NOT_LOGGED_IN:
+            raise PermissionError("You don't have permission to use the uploader service, please sign up and wait for approval")
+        return f"We is here: {str(context)}"
+
+    async def test_auth(context=None):
+        # TODO: REMOVE ME
+        """
+        Test function
+        """
+        if check_context_permission(context) < Permission.LOGGED_IN:
+            raise PermissionError("You don't have permission to use the uploader service, please sign up and wait for approval")
+        return f"We is here: {str(context)}"
+
+    async def notify_ci(payload: dict, context=None):
+        """
+        Notify the CI of a job to perform
+        """
+        if check_context_permission(context) < Permission.LOGGED_IN:
+            raise PermissionError("You don't have permission to use the uploader service, please sign up and wait for approval")
+        raise NotImplementedError("Move netlify function to here")
 
 
-    version = pkg_resources.get_distribution("bioimageio-upload-review").version
     hypha_service_info = await server.register_service(
         {
-            "name": "BioImage.IO Upload Review",
-            "id": "bioimageio-upload-review",
+            "name": "BioImage.IO Uploader Service",
+            "id": "bioimageio-uploader-service",
             "config": {"visibility": "public", "require_context": True},
-            "version": version,
+            "version": __version__,
             "ping": ping,
             "chat": chat,
+            "test": test,
             "review": review,
+            "notify_ci": notify_ci,
         }
     )
 
     server_url = server.config["public_base_url"]
 
-    service_id = hypha_service_info["id"]
-    print(
-        f"\nThe BioImage.IO Upload Review endpoint is available at: https://bioimage.io/upload-review?server={server_url}&service_id={service_id}\n"
-    )
+    # service_id = hypha_service_info["id"]
+    # print(
+        # f"\nThe BioImage.IO Upload Review service is available at the Hypha server running at {server_url}"
+    # )
+    print(server.config)
+    print(hypha_service_info)
+    print(f"Test it with the HTTP proxy: {server_url}/{server.config.workspace}/services/bioimageio-uploader-service/test?")

@@ -2,10 +2,10 @@
 requires = ["setuptools", "wheel"]
 
 [project]
-name = "bioimageio-upload-review"
+name = "bioimageio-uploader-service"
 version = "0.1.0"
 readme = "README.md"
-description = "BioImage.IO Uploader Review API."
+description = "BioImage.IO Uploader Service Functions."
 dynamic = ["dependencies"]
 
 [tool.setuptools]
@@ -20,5 +20,5 @@ exclude = ["tests*", "scripts*"]
 
 [options.entry_points]
 console_scripts = [
-    "bioimageio-upload-review = bioimageio_upload_review.__main__:main",
+    "bioimageio-uploader-service = bioimageio_uploader_service.__main__:main",
 ]

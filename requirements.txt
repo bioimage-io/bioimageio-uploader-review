@@ -4,4 +4,5 @@ loguru==0.7.2
 setuptools==69.0.3
 hypha==0.15.50
 bioimageio-collection-backoffice @ git+https://github.com/bioimage-io/collection@99d2838
+tomli==2.0.1; python_version < '3.11'
 
