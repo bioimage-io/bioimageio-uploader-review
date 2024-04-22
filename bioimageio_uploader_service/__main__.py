@@ -7,6 +7,10 @@ from loguru import logger
 
 from bioimageio_uploader_service.api import connect_server
 
+__HYPHA_SERVER__ = "https://ai.imjoy.io"
+# __HYPHA_SERVER__ = "https://hypha.bioimage.io"
+__LOGIN_REQUIRED__ = True
+
 
 def start(
     host: str = "0.0.0.0",
@@ -30,7 +34,7 @@ def start(
     subprocess.run(command)
 
 
-def connect(server_url: str = "https://ai.imjoy.io", login_required: bool = False):
+def connect(server_url: str = __HYPHA_SERVER__, login_required: bool = __LOGIN_REQUIRED__):
     logger.info("Connecting to server at : {}", server_url)
     if login_required:
         os.environ["BIOIMAGEIO_LOGIN_REQUIRED"] = "true"
