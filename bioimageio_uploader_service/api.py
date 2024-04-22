@@ -5,7 +5,11 @@ import traceback
 from typing import Any
 from functools import wraps
 from dataclasses import dataclass, field, InitVar
-from enum import IntEnum, StrEnum, auto
+from enum import IntEnum, auto
+try:
+    from enum import StrEnum
+except ImportError:
+    from strenum import StrEnum
 
 import requests
 from imjoy_rpc.hypha import connect_to_server, login
@@ -18,7 +22,7 @@ from bioimageio_uploader_service import __version__
 class MissingEnvironmentVariable(Exception):
     pass
 
-CONNECTION_VARS = {"host": "S3_HOST", "bucket": "S3_BUCKET", "prefix": "S3_FOLDER"}
+CONNECTION_VARS = {"host": "S3_HOST", "bucket": "S3_BUCKET", "prefix": "S3_PREFIX"}
 if not set(os.environ).issuperset(CONNECTION_VARS.values()):
     logger.error("Must be run with following env vars: {}", ", ".join(CONNECTION_VARS.values()))
     missing = [var for var in CONNECTION_VARS.values() if var not in os.environ]
