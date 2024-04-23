@@ -6,4 +6,4 @@ hypha==0.15.50
 bioimageio-collection-backoffice @ git+https://github.com/bioimage-io/collection@a029bdf
 tomli==2.0.1; python_version < '3.11'
 StrEnum==0.1.0; python_version < '3.11'
-
+python-dotenv==1.0.1 # dotenv

@@ -1,5 +1,9 @@
 import os
 import sys
+
+import dotenv
+dotenv.load_dotenv()
+
 if sys.version_info[0] < 3:
     raise RuntimeError("Must be run with Python 3")
 if sys.version_info[1] >= 11:
