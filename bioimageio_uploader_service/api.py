@@ -5,11 +5,7 @@ import traceback
 from typing import Any
 from functools import wraps
 from dataclasses import dataclass, field, InitVar
-from enum import IntEnum, auto
-try:
-    from enum import StrEnum
-except ImportError:
-    from strenum import StrEnum
+from enum import Enum, IntEnum
 
 import requests
 from imjoy_rpc.hypha import connect_to_server, login
@@ -22,21 +18,26 @@ from bioimageio_uploader_service import __version__
 class MissingEnvironmentVariable(Exception):
     pass
 
+
 CONNECTION_VARS = {"host": "S3_HOST", "bucket": "S3_BUCKET", "prefix": "S3_PREFIX"}
 if not set(os.environ).issuperset(CONNECTION_VARS.values()):
-    logger.error("Must be run with following env vars: {}", ", ".join(CONNECTION_VARS.values()))
+    logger.error(
+        "Must be run with following env vars: {}", ", ".join(CONNECTION_VARS.values())
+    )
     missing = [var for var in CONNECTION_VARS.values() if var not in os.environ]
     raise MissingEnvironmentVariable(f"Missing environment variables: {missing}")
-BACKOFFICE_KWARGS = {var: os.environ[env_var] for var, env_var in CONNECTION_VARS.items()}
-CI_STAGE_URL = os.environ['GITHUB_URL_STAGE']
-CI_REF = os.environ['GITHUB_REF']
-CI_TOKEN = os.environ['GITHUB_TOKEN']
-CI_HEADERS = {
-    'Accept': 'application/vnd.github.v3+json',
-    'Authorization': f"token {CI_TOKEN}",
-    'Content-Type': "application/json",
+BACKOFFICE_KWARGS = {
+    var: os.environ[env_var] for var, env_var in CONNECTION_VARS.items()
 }
-REVIEWERS_URL = os.environ['REVIEWERS_URL']
+CI_STAGE_URL = os.environ["GITHUB_URL_STAGE"]
+CI_REF = os.environ["GITHUB_REF"]
+CI_TOKEN = os.environ["GITHUB_TOKEN"]
+CI_HEADERS = {
+    "Accept": "application/vnd.github.v3+json",
+    "Authorization": f"token {CI_TOKEN}",
+    "Content-Type": "application/json",
+}
+REVIEWERS_URL = os.environ["REVIEWERS_URL"]
 
 
 class Permission(IntEnum):
@@ -44,6 +45,7 @@ class Permission(IntEnum):
     ANONYMOUS = 1
     LOGGED_IN = 2
     REVIEWER = 3
+
 
 @dataclass
 class ResourceData:
@@ -55,23 +57,35 @@ class ResourceData:
     def __post_init__(self):
         self.timestamp = str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
-class ReviewAction(StrEnum):
-    REQUESTCHANGES = auto()
-    PUBLISH = auto()
+
+class ReviewAction(str, Enum):
+    REQUESTCHANGES = "requestchanges"
+    PUBLISH = "publish"
+
 
 @dataclass
 class ReviewData(ResourceData):
     action: ReviewAction
     message: str = ""
 
-    def save(self, backoffice:  BackOffice):
+    def save(self, backoffice: BackOffice):
         logger.info("Requesting review: {}", self)
         if self.action == ReviewAction.PUBLISH:
-            backoffice.publish(resource_id=self.resource_id, version=self.version,  reviewer=self.user_id)
+            backoffice.publish(
+                resource_id=self.resource_id,
+                version=self.version,
+                reviewer=self.user_id,
+            )
         elif self.action == ReviewAction.REQUESTCHANGES:
-            backoffice.request_changes(resource_id=self.resource_id, version=self.version, reviewer=self.user_id, reason=self.message)
+            backoffice.request_changes(
+                resource_id=self.resource_id,
+                version=self.version,
+                reviewer=self.user_id,
+                reason=self.message,
+            )
         else:
             raise ValueError("review_data must contain valid action field")
+
 
 @dataclass
 class ChatData(ResourceData):
@@ -79,13 +93,14 @@ class ChatData(ResourceData):
 
     def save(self, backoffice: BackOffice):
         backoffice.add_chat_message(
-                resource_id=self.resource_id,
-                version=self.version,
-                chat_message=self.message,
-                author=self.user_id)
+            resource_id=self.resource_id,
+            version=self.version,
+            chat_message=self.message,
+            author=self.user_id,
+        )
 
 
-@dataclass 
+@dataclass
 class JsonResponse(dict):
     data: InitVar[dict | None]
     error: InitVar[Exception | None]
@@ -95,12 +110,12 @@ class JsonResponse(dict):
             if isinstance(data, dict):
                 self.update(data)
             else:
-                self['data'] = data 
-            self['success'] = True
+                self["data"] = data
+            self["success"] = True
         if error is not None:
-            self['success'] = False
-            self['error'] = traceback.format_exception(error)
-        
+            self["success"] = False
+            self["error"] = traceback.format_exception(error)
+
 
 def jsonify_async_handler(handler):
     @wraps(handler)
@@ -111,9 +126,10 @@ def jsonify_async_handler(handler):
             data = await handler(*args, **kwargs)
         except Exception as err:
             error = err
-        return JsonResponse(data=data, error=error) 
+        return JsonResponse(data=data, error=error)
+
     return wrapper
-   
+
 
 async def connect_server(server_url):
     """Connect to the server and register the chat service."""
@@ -130,37 +146,41 @@ async def connect_server(server_url):
 
 def load_reviewer_ids() -> set[str]:
     """Loads reviewer ids from remote json file"""
-    response = requests.get("https://raw.githubusercontent.com/bioimage-io/collection/main/reviewers.json")
+    response = requests.get(
+        "https://raw.githubusercontent.com/bioimage-io/collection/main/reviewers.json"
+    )
     reviewers = response.json()
     reviewer_ids = set(reviewers)
     # Drop any accidental unset ids
-    reviewer_ids.discard('')
+    reviewer_ids.discard("")
     reviewer_ids.discard(None)
     return reviewer_ids
 
 
 def save_latest_collection_template_json(
-        url:str="https://raw.githubusercontent.com/bioimage-io/collection/main/collection_template.json",
-        destination="collection_template.json",
-    ):
+    url: str = "https://raw.githubusercontent.com/bioimage-io/collection/main/collection_template.json",
+    destination="collection_template.json",
+):
     """
     Saves the latest collection_template.json file to the CWD
     """
     response = requests.get(url)
     if response.status_code != 200:
-        raise Exception('Unable to find collection_template.json at {}', url)
-    with open(destination, 'wb') as file:
+        raise Exception("Unable to find collection_template.json at {}", url)
+    with open(destination, "wb") as file:
         file.write(response.content)
-        
+
 
 async def register_uploader_service(server):
     """Hypha startup function."""
-    # debug = os.environ.get("BIOIMAGEIO_DEBUG") == "true"
-    # login_required = os.environ.get("BIOIMAGEIO_LOGIN_REQUIRED") == "true"
-    # login_required = True
-    uploader_logs_path = os.environ.get("BIOIMAGEIO_REVIEW_LOGS_PATH", "./uploader_logs")
+    uploader_logs_path = os.environ.get(
+        "BIOIMAGEIO_REVIEW_LOGS_PATH", "./uploader_logs"
+    )
 
     backoffice = BackOffice(**BACKOFFICE_KWARGS)
+    backoffice_sandbox = BackOffice(
+        **(BACKOFFICE_KWARGS | {"prefix": f"sandbox.{BACKOFFICE_KWARGS['prefix']}"})
+    )
 
     assert (
         uploader_logs_path is not None
@@ -177,11 +197,11 @@ async def register_uploader_service(server):
     def check_permission(user):
         if user is None:
             return Permission.NOT_LOGGED_IN
-        if user['is_anonymous']:
+        if user["is_anonymous"]:
             return Permission.ANONYMOUS
-        if user['id'] in reviewer_ids:
+        if user["id"] in reviewer_ids:
             return Permission.REVIEWER
-        if user['email']:
+        if user["email"]:
             return Permission.LOGGED_IN
         return Permission.NOT_LOGGED_IN
 
@@ -191,50 +211,22 @@ async def register_uploader_service(server):
         user = context.get("user")
         return check_permission(user)
 
-    @jsonify_async_handler
-    async def review(resource_id:str, version:str, action:str, message:str, context=None):
-        if check_context_permission(context) is not Permission.REVIEWER:
-            raise PermissionError("You must be logged in and have permission for this function")
-        # get the review-service version
-        assert context is not None, "Context cannot be none"
-        review_data = ReviewData(
-                resource_id=resource_id,
-                version=version,
-                action=ReviewAction(action),
-                message=message,
-                user_id=context.get("user").get("id"),
-            )
-        logger.info("Created review:")
-        logger.info(review_data)
-        review_data.save(backoffice)
-
-    @jsonify_async_handler
-    async def chat(resource_id: str, version: str, message: str, context=None):
+    async def notify_ci(url: str, inputs: dict, context=None) -> dict:
         if check_context_permission(context) < Permission.LOGGED_IN:
-            raise PermissionError("You must be logged in to comment on the review")
-        assert context is not None
-        logger.info(f"User: {context.get('user')}, Message: {message}")
-
-        chat_data = ChatData(
-            resource_id=resource_id,
-            version=version,
-            message=message,
-            user_id=context.get("user", {}).get('email'),
+            raise PermissionError(
+                "You don't have permission to use the uploader service, please sign up and wait for approval"
             )
-        chat_data.save(backoffice)
+        data = {"ref": CI_REF, "inputs": inputs}
+        print("NOTIFYING GITHUB:")
+        print("data")
+        print(data)
 
-    @jsonify_async_handler
-    async def proxy(url:str, context=None, is_json=False) -> dict:
-        """
-        Basically just a 'middle-man' function to bridge get requests to resources that currently block
-        the serving domain
-        """
-        if check_context_permission(context) == Permission.NOT_LOGGED_IN:
-            raise PermissionError("Forbidden")
-        response = requests.get(url)
-        if is_json:
-            return response.json()
-        return {'body': requests.get(url).content.decode('utf-8', errors='ignore')}
+        resp = requests.post(url, data=json.dumps(data), headers=CI_HEADERS)
+        if resp.status_code == 204:
+            # According to API docs, just expect a 204
+            return {"status": resp.status_code}
+        else:
+            return {"message": f"Failed :(  {resp.content}", "status": 500}
 
     @jsonify_async_handler
     async def ping(context=None) -> str:
@@ -246,67 +238,95 @@ async def register_uploader_service(server):
         return "pong"
 
     @jsonify_async_handler
-    async def test(context=None):
-        # TODO: REMOVE ME
-        """
-        Test function
-        """
-        if check_context_permission(context) == Permission.NOT_LOGGED_IN:
-            raise PermissionError("Forbidden")
-        return f"We is here: {str(context)}"
-
-    @jsonify_async_handler
-    async def test_auth(context=None):
-        # TODO: REMOVE ME
-        """
-        Test function
-        """
-        if check_context_permission(context) < Permission.LOGGED_IN:
-            raise PermissionError("You don't have permission to use the uploader service, please sign up and wait for approval")
-        return f"We is here: {str(context)}"
-
-    @jsonify_async_handler
     async def is_reviewer(context=None) -> bool:
         """
         Return true if the current user is a reviewer
         """
         return check_context_permission(context) == Permission.REVIEWER
 
-    async def stage(resource_path: str, package_url: str, sandbox: bool=False, context=None) -> dict:
+    @jsonify_async_handler
+    async def chat(
+        resource_id: str,
+        version: str,
+        message: str,
+        sandbox: bool = False,
+        context=None,
+    ):
+        if check_context_permission(context) < Permission.LOGGED_IN:
+            raise PermissionError("You must be logged in to comment on the review")
+        assert context is not None
+        logger.info(f"User: {context.get('user')}, Message: {message}")
+
+        chat_data = ChatData(
+            resource_id=resource_id,
+            version=version,
+            message=message,
+            user_id=context.get("user", {}).get("email"),
+        )
+        if sandbox:
+            chat_data.save(backoffice_sandbox)
+        else:
+            chat_data.save(backoffice)
+
+    @jsonify_async_handler
+    async def stage(
+        resource_path: str, package_url: str, sandbox: bool = False, context=None
+    ) -> dict:
         """
         Notify the CI of a stage
         """
 
         inputs = {
-            'resource_id': resource_path,
-            'package_url': package_url,
-            'sandbox': sandbox,
+            "resource_id": resource_path,
+            "package_url": package_url,
+            "sandbox": sandbox,
         }
         print("IN STAGE:")
         print("    INPUTS:")
         print(inputs)
         return await notify_ci(CI_STAGE_URL, inputs, context=context)
 
+    @jsonify_async_handler
+    async def review(
+        resource_id: str,
+        version: str,
+        action: str,
+        message: str,
+        sandbox: bool = False,
+        context=None,
+    ):
+        if check_context_permission(context) is not Permission.REVIEWER:
+            raise PermissionError(
+                "You must be logged in and have permission for this function"
+            )
+        # get the review-service version
+        assert context is not None, "Context cannot be none"
+        review_data = ReviewData(
+            resource_id=resource_id,
+            version=version,
+            action=ReviewAction(action),
+            message=message,
+            user_id=context.get("user").get("id"),
+        )
+        logger.info("Created review:")
+        logger.info(review_data)
+        if sandbox:
+            review_data.save(backoffice_sandbox)
+        else:
+            review_data.save(backoffice)
 
     @jsonify_async_handler
-    async def notify_ci(url:str, inputs: dict, context=None) -> dict:
-        if check_context_permission(context) < Permission.LOGGED_IN:
-            raise PermissionError("You don't have permission to use the uploader service, please sign up and wait for approval")
-        data = {'ref': CI_REF, 'inputs': inputs}
-        print("NOTIFYING GITHUB:")
-        print("data")
-        print(data)
-
-        resp = requests.post(url,
-                             data=json.dumps(data),
-                             headers=CI_HEADERS)
-        if resp.status_code == 204:
-            # According to API docs, just expect a 204
-            return { 'status': resp.status_code }
-        else:
-            return {'message': f"Failed :(  {resp.content}", 'status':500}
-
-
+    async def proxy(url: str, context=None, is_json=False) -> dict:
+        """
+        Basically just a 'middle-man' function to bridge get requests to resources that currently block
+        the serving domain
+        """
+        if check_context_permission(context) == Permission.NOT_LOGGED_IN:
+            raise PermissionError("Forbidden")
+        response = requests.get(url)
+        if is_json:
+            return response.json()
+        return {"body": requests.get(url).content.decode("utf-8", errors="ignore")}
 
     hypha_service_info = await server.register_service(
         {
@@ -315,13 +335,11 @@ async def register_uploader_service(server):
             "config": {"visibility": "public", "require_context": True},
             "version": __version__,
             "ping": ping,
-            "proxy": proxy,
-            "chat": chat,
-            "test": test,
-            "test_auth": test_auth,
             "is_reviewer": is_reviewer,
-            "review": review,
+            "chat": chat,
             "stage": stage,
+            "review": review,
+            "proxy": proxy,
         }
     )
 
@@ -329,8 +347,10 @@ async def register_uploader_service(server):
 
     # service_id = hypha_service_info["id"]
     # print(
-        # f"\nThe BioImage.IO Upload Review service is available at the Hypha server running at {server_url}"
+    # f"\nThe BioImage.IO Upload Review service is available at the Hypha server running at {server_url}"
     # )
     print(server.config)
     print(hypha_service_info)
-    print(f"Test it with the HTTP proxy: {server_url}/{server.config.workspace}/services/bioimageio-uploader-service/test?")
+    print(
+        f"Test it with the HTTP proxy: {server_url}/{server.config.workspace}/services/bioimageio-uploader-service/ping?"
+    )
