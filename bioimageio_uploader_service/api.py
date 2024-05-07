@@ -5,11 +5,7 @@ import traceback
 from typing import Any
 from functools import wraps
 from dataclasses import dataclass, field, InitVar
-from enum import IntEnum, auto
-try:
-    from enum import StrEnum
-except ImportError:
-    from strenum import StrEnum
+from enum import IntEnum, auto, Enum
 
 import requests
 from imjoy_rpc.hypha import connect_to_server, login
@@ -17,7 +13,7 @@ from loguru import logger
 
 from bioimageio_collection_backoffice._backoffice import BackOffice
 from bioimageio_uploader_service import __version__
-
+from bioimageio.spec import validate_format, ValidationContext
 
 class MissingEnvironmentVariable(Exception):
     pass
@@ -55,9 +51,9 @@ class ResourceData:
     def __post_init__(self):
         self.timestamp = str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
-class ReviewAction(StrEnum):
-    REQUESTCHANGES = auto()
-    PUBLISH = auto()
+class ReviewAction(str, Enum):
+    REQUESTCHANGES = "requestchanges"
+    PUBLISH = "publish"
 
 @dataclass
 class ReviewData(ResourceData):
@@ -287,6 +283,10 @@ async def register_uploader_service(server):
         print(inputs)
         return await notify_ci(CI_STAGE_URL, inputs, context=context)
 
+    async def validate(rdf_dict, context=None):
+        ctx = ValidationContext(perform_io_checks=False)
+        summary = validate_format(rdf_dict, context=ctx)
+        return summary.format()
 
     @jsonify_async_handler
     async def notify_ci(url:str, inputs: dict, context=None) -> dict:
@@ -312,7 +312,7 @@ async def register_uploader_service(server):
         {
             "name": "BioImage.IO Uploader Service",
             "id": "bioimageio-uploader-service",
-            "config": {"visibility": "public", "require_context": True},
+            "config": {"visibility": "public", "require_context": True, "run_in_executor": True},
             "version": __version__,
             "ping": ping,
             "proxy": proxy,
@@ -322,6 +322,7 @@ async def register_uploader_service(server):
             "is_reviewer": is_reviewer,
             "review": review,
             "stage": stage,
+            "validate": validate
         }
     )
 
