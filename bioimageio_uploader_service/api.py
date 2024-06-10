@@ -5,7 +5,7 @@ import traceback
 from typing import Any
 from functools import wraps
 from dataclasses import dataclass, field, InitVar
-from enum import Enum, IntEnum
+from enum import IntEnum, auto, Enum
 
 import requests
 from imjoy_rpc.hypha import connect_to_server, login
@@ -13,7 +13,7 @@ from loguru import logger
 
 from bioimageio_collection_backoffice._backoffice import BackOffice
 from bioimageio_uploader_service import __version__
-
+from bioimageio.spec import validate_format, ValidationContext
 
 class MissingEnvironmentVariable(Exception):
     pass
@@ -57,11 +57,9 @@ class ResourceData:
     def __post_init__(self):
         self.timestamp = str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
-
 class ReviewAction(str, Enum):
     REQUESTCHANGES = "requestchanges"
     PUBLISH = "publish"
-
 
 @dataclass
 class ReviewData(ResourceData):
@@ -146,29 +144,11 @@ async def connect_server(server_url):
 
 def load_reviewer_ids() -> set[str]:
     """Loads reviewer ids from remote json file"""
-    response = requests.get(
-        "https://raw.githubusercontent.com/bioimage-io/collection/main/reviewers.json"
-    )
-    reviewers = response.json()
-    reviewer_ids = set(reviewers)
-    # Drop any accidental unset ids
-    reviewer_ids.discard("")
-    reviewer_ids.discard(None)
+    response = requests.get("https://raw.githubusercontent.com/bioimage-io/collection/main/bioimageio_collection_config.json")
+    config = response.json()
+    reviewers = config["reviewers"]
+    reviewer_ids = set([reviewer['id'] for reviewer in reviewers])
     return reviewer_ids
-
-
-def save_latest_collection_template_json(
-    url: str = "https://raw.githubusercontent.com/bioimage-io/collection/main/collection_template.json",
-    destination="collection_template.json",
-):
-    """
-    Saves the latest collection_template.json file to the CWD
-    """
-    response = requests.get(url)
-    if response.status_code != 200:
-        raise Exception("Unable to find collection_template.json at {}", url)
-    with open(destination, "wb") as file:
-        file.write(response.content)
 
 
 async def register_uploader_service(server):
@@ -192,7 +172,6 @@ async def register_uploader_service(server):
         os.makedirs(uploader_logs_path, exist_ok=True)
 
     reviewer_ids = load_reviewer_ids()
-    save_latest_collection_template_json()
 
     def check_permission(user):
         if user is None:
@@ -286,6 +265,14 @@ async def register_uploader_service(server):
         print(inputs)
         return await notify_ci(CI_STAGE_URL, inputs, context=context)
 
+    async def validate(rdf_dict, context=None):
+        ctx = ValidationContext(perform_io_checks=False)
+        summary = validate_format(rdf_dict, context=ctx)
+        return {
+            "success": summary.status == "passed",
+            "details": summary.format()
+        }
+
     @jsonify_async_handler
     async def review(
         resource_id: str,
@@ -332,7 +319,7 @@ async def register_uploader_service(server):
         {
             "name": "BioImage.IO Uploader Service",
             "id": "bioimageio-uploader-service",
-            "config": {"visibility": "public", "require_context": True},
+            "config": {"visibility": "public", "require_context": True, "run_in_executor": True},
             "version": __version__,
             "ping": ping,
             "is_reviewer": is_reviewer,
@@ -340,6 +327,7 @@ async def register_uploader_service(server):
             "stage": stage,
             "review": review,
             "proxy": proxy,
+            "validate": validate
         }
     )
 

@@ -3,6 +3,7 @@ imjoy-rpc==0.5.48.post2
 loguru==0.7.2
 setuptools==69.0.3
 hypha==0.15.50
-bioimageio-collection-backoffice @ git+https://github.com/bioimage-io/collection@cf045a3
+bioimageio-collection-backoffice @ git+https://github.com/bioimage-io/collection@main
 tomli==2.0.1; python_version < '3.11'
+StrEnum==0.4.15; python_version < '3.11'
 python-dotenv==1.0.1 # dotenv

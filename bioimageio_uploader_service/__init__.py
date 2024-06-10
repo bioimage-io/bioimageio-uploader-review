@@ -11,6 +11,9 @@ if sys.version_info[1] >= 11:
     import tomllib
 else:
     import tomli as tomllib
+import dotenv
+
+dotenv.load_dotenv()
 
 __root_folder__ = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 __version__ = (
