@@ -126,28 +126,12 @@ async def connect_server(server_url):
 
 def load_reviewer_ids() -> set[str]:
     """Loads reviewer ids from remote json file"""
-    response = requests.get("https://raw.githubusercontent.com/bioimage-io/collection/main/reviewers.json")
-    reviewers = response.json()
-    reviewer_ids = set(reviewers)
-    # Drop any accidental unset ids
-    reviewer_ids.discard('')
-    reviewer_ids.discard(None)
+    response = requests.get("https://raw.githubusercontent.com/bioimage-io/collection/main/bioimageio_collection_config.json")
+    config = response.json()
+    reviewers = config["reviewers"]
+    reviewer_ids = set([reviewer['id'] for reviewer in reviewers])
     return reviewer_ids
 
-
-def save_latest_collection_template_json(
-        url:str="https://raw.githubusercontent.com/bioimage-io/collection/main/collection_template.json",
-        destination="collection_template.json",
-    ):
-    """
-    Saves the latest collection_template.json file to the CWD
-    """
-    response = requests.get(url)
-    if response.status_code != 200:
-        raise Exception('Unable to find collection_template.json at {}', url)
-    with open(destination, 'wb') as file:
-        file.write(response.content)
-        
 
 async def register_uploader_service(server):
     """Hypha startup function."""
@@ -168,7 +152,6 @@ async def register_uploader_service(server):
         os.makedirs(uploader_logs_path, exist_ok=True)
 
     reviewer_ids = load_reviewer_ids()
-    save_latest_collection_template_json()
 
     def check_permission(user):
         if user is None:
