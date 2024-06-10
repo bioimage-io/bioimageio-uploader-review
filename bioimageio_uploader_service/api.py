@@ -269,7 +269,10 @@ async def register_uploader_service(server):
     async def validate(rdf_dict, context=None):
         ctx = ValidationContext(perform_io_checks=False)
         summary = validate_format(rdf_dict, context=ctx)
-        return summary.format()
+        return {
+            "success": summary.status == "passed",
+            "details": summary.format()
+        }
 
     @jsonify_async_handler
     async def notify_ci(url:str, inputs: dict, context=None) -> dict:
