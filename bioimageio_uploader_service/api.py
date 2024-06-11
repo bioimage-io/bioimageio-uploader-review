@@ -264,6 +264,26 @@ async def register_uploader_service(server):
         print("    INPUTS:")
         print(inputs)
         return await notify_ci(CI_STAGE_URL, inputs, context=context)
+    
+    @jsonify_async_handler
+    async def trigger_test(
+        resource_path: str, version: str, sandbox: bool = False, context=None
+    ) -> dict:
+        """
+        Trigger the CI for a test
+        """
+
+        inputs = {
+            "resource_id": resource_path,
+            "version": version,
+            "sandbox": sandbox,
+        }
+        print("IN TRIGGER TEST:")
+        print("    INPUTS:")
+        print(inputs)
+        return await notify_ci(CI_STAGE_URL, inputs, context=context)
+
+
 
     async def validate(rdf_dict, context=None):
         ctx = ValidationContext(perform_io_checks=False)
@@ -327,7 +347,8 @@ async def register_uploader_service(server):
             "stage": stage,
             "review": review,
             "proxy": proxy,
-            "validate": validate
+            "validate": validate,
+            "trigger_test": trigger_test,
         }
     )
 
