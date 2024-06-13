@@ -71,7 +71,7 @@ class ReviewData(ResourceData):
         logger.info("Requesting review: {}", self)
         if self.action == ReviewAction.PUBLISH:
             backoffice.publish(
-                resource_id=self.resource_id,
+                concept_id=self.resource_id,
                 version=self.version,
                 reviewer=self.user_id,
             )
@@ -84,19 +84,6 @@ class ReviewData(ResourceData):
             )
         else:
             raise ValueError("review_data must contain valid action field")
-
-
-@dataclass
-class ChatData(ResourceData):
-    message: str
-
-    def save(self, backoffice: BackOffice):
-        backoffice.add_chat_message(
-            concept_id=self.resource_id,
-            version=self.version,
-            chat_message=self.message,
-            author=self.user_id,
-        )
 
 
 @dataclass
@@ -236,17 +223,21 @@ async def register_uploader_service(server):
             raise PermissionError("You must be logged in to comment on the review")
         assert context is not None
         logger.info(f"User: {context.get('user')}, Message: {message}")
-
-        chat_data = ChatData(
-            resource_id=resource_id,
-            version=version,
-            message=message,
-            user_id=context.get("user", {}).get("email"),
-        )
+  
         if sandbox:
-            chat_data.save(backoffice_sandbox)
+            backoffice_sandbox.add_chat_message(
+                concept_id=resource_id,
+                version=version,
+                chat_message=message,
+                author=context.get("user", {}).get("email"),
+            )
         else:
-            chat_data.save(backoffice)
+            backoffice.add_chat_message(
+                concept_id=resource_id,
+                version=version,
+                chat_message=message,
+                author=context.get("user", {}).get("email"),
+            )
 
     @jsonify_async_handler
     async def stage(
