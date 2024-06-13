@@ -21,6 +21,7 @@ You will need to set the following environment variables:
 * `S3_ACCESS_KEY_ID`: S3 access ID
 * `S3_SECRET_ACCESS_KEY`: S3 Secret key
 * `GITHUB_URL_STAGE`: Github CI workflow-dispatch end-point for staging 
+* `GITHUB_URL_TEST`: Github CI workflow-dispatch end-point for testing
 * `GITHUB_REF`: Branch to use (usually `main`)
 * `GITHUB_TOKEN`: Github Access Token
 * `REVIEWERS_URL`: URL to reviewers JSON file; see below for the public URL used by this service
@@ -37,7 +38,8 @@ S3_BUCKET='datasets'
 S3_PREFIX='my-model-folder'
 S3_ACCESS_KEY_ID='2...'
 S3_SECRET_ACCESS_KEY='...'
-GITHUB_URL_STAGE='https://api.github.com/repos/xxxxxx/collection/actions/workflows/xxxxxx/dispatches' 
+GITHUB_URL_STAGE='https://api.github.com/repos/xxxxxx/collection/actions/workflows/xxxxxx/dispatches'
+GITHUB_URL_TEST = 'https://api.github.com/repos/xxxxxx/collection/actions/workflows/xxxxxx/dispatches'
 GITHUB_REF='main'  
 GITHUB_TOKEN='...'
 REVIEWERS_URL='https://raw.githubusercontent.com/bioimage-io/collection/main/reviewers.json'

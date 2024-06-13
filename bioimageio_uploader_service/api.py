@@ -30,6 +30,7 @@ BACKOFFICE_KWARGS = {
     var: os.environ[env_var] for var, env_var in CONNECTION_VARS.items()
 }
 CI_STAGE_URL = os.environ["GITHUB_URL_STAGE"]
+CI_TEST_URL = os.environ["GITHUB_URL_TEST"]
 CI_REF = os.environ["GITHUB_REF"]
 CI_TOKEN = os.environ["GITHUB_TOKEN"]
 CI_HEADERS = {
@@ -91,7 +92,7 @@ class ChatData(ResourceData):
 
     def save(self, backoffice: BackOffice):
         backoffice.add_chat_message(
-            resource_id=self.resource_id,
+            concept_id=self.resource_id,
             version=self.version,
             chat_message=self.message,
             author=self.user_id,
@@ -281,8 +282,7 @@ async def register_uploader_service(server):
         print("IN TRIGGER TEST:")
         print("    INPUTS:")
         print(inputs)
-        return await notify_ci(CI_STAGE_URL, inputs, context=context)
-
+        return await notify_ci(CI_TEST_URL, inputs, context=context)
 
 
     async def validate(rdf_dict, context=None):
