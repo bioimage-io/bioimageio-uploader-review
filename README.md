@@ -24,8 +24,6 @@ You will need to set the following environment variables:
 * `GITHUB_URL_TEST`: Github CI workflow-dispatch end-point for testing
 * `GITHUB_REF`: Branch to use (usually `main`)
 * `GITHUB_TOKEN`: Github Access Token
-* `REVIEWERS_URL`: URL to reviewers JSON file; see below for the public URL used by this service
-* `MAIL_PASSWORD`: Mail password to enable mail notifications; NOTE: this is currently mandatory. 
 ``` 
 
 
@@ -42,8 +40,6 @@ GITHUB_URL_STAGE='https://api.github.com/repos/xxxxxx/collection/actions/workflo
 GITHUB_URL_TEST = 'https://api.github.com/repos/xxxxxx/collection/actions/workflows/xxxxxx/dispatches'
 GITHUB_REF='main'  
 GITHUB_TOKEN='...'
-REVIEWERS_URL='https://raw.githubusercontent.com/bioimage-io/collection/main/reviewers.json'
-MAIL_PASSWORD='...'
 ``` 
 
 ## Command-line Interface

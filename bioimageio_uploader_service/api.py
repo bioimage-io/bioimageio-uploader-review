@@ -38,8 +38,6 @@ CI_HEADERS = {
     "Authorization": f"token {CI_TOKEN}",
     "Content-Type": "application/json",
 }
-REVIEWERS_URL = os.environ["REVIEWERS_URL"]
-
 
 class Permission(IntEnum):
     NOT_LOGGED_IN = 0
@@ -332,6 +330,7 @@ async def register_uploader_service(server):
             "id": "bioimageio-uploader-service",
             "config": {"visibility": "public", "require_context": True, "run_in_executor": True},
             "version": __version__,
+            "create_upload": create_upload,
             "ping": ping,
             "is_reviewer": is_reviewer,
             "chat": chat,
