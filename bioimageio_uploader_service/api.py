@@ -119,7 +119,9 @@ async def connect_server(server_url):
     """Connect to the server and register the chat service."""
     login_required = os.environ.get("BIOIMAGEIO_LOGIN_REQUIRED") == "true"
     if login_required:
-        token = await login({"server_url": server_url})
+        async def login_callback(context):
+            logger.info("Please login at the following URL: {}", context['login_url'])
+        token = await login({"server_url": server_url, "login_callback": login_callback})
     else:
         token = None
     server = await connect_to_server(
@@ -330,7 +332,7 @@ async def register_uploader_service(server):
             "id": "bioimageio-uploader-service",
             "config": {"visibility": "public", "require_context": True, "run_in_executor": True},
             "version": __version__,
-            "create_upload": create_upload,
+            # "create_upload": create_upload,
             "ping": ping,
             "is_reviewer": is_reviewer,
             "chat": chat,
